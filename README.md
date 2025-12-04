@@ -1,202 +1,195 @@
-ESG Score Generator (Web Scraper + GenAI + PDF Analyzer)
+<div align="center">
 
-This project builds an end-to-end ESG (Environmental, Social, Governance) scoring pipeline using:
-	•	Web scraping
-	•	PDF extraction
-	•	Vector embeddings
-	•	LLM-based ESG signal extraction
-	•	Rule-based scoring
-	•	Generative narrative summary
+# 🌍 ESG Scorer
 
-It takes either a company name OR a URL, automatically discovers ESG sources (webpages + PDFs), analyzes them, and returns:
-	•	ESG scores (E, S, G, Total)
-	•	Extracted ESG evidence
-	•	A generated ESG performance explanation
+**AI-powered ESG scoring pipeline for comprehensive sustainability analysis**
 
-This is a fully automated ESG intelligence engine using real corporate data.
+[![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-⸻
+[Features](#-features) • [Quick Start](#-quick-start) • [Usage](#-usage) • [Deployment](#-deployment) • [How It Works](#-how-it-works)
 
-Features
+---
 
-1. Automatic Company Discovery
+*Crawl websites, extract ESG data from HTML & PDFs, query the web for evidence, and generate structured ESG scores with AI-powered analysis.*
 
-Input can be either:
-	•	netflix
-	•	microsoft
-	•	apple.com
-	•	https://about.netflix.com/sustainability
+</div>
 
-The system:
-	1.	Detects the likely domain
-	2.	Crawls the website for ESG content
-	3.	Scrapes ESG-related HTML pages and links
-	4.	Detects on-site ESG PDFs (CSR reports, sustainability reports, impact reports)
+## ✨ Features
 
-⸻
+### 🔍 Intelligent Data Collection
+- **Smart domain lookup** from company names
+- **Two-stage crawler** — ESG-targeted first, full-site fallback
+- **Multi-format extraction** — HTML pages and PDFs (with OCR)
+- **Web-augmented search** via Serper API for ESG PDFs, pages, and snippets
 
-2. External ESG PDF Search (Serper.dev + Google Results)
+### 🤖 AI-Powered ESG Extraction
+Extracts structured signals across all three pillars:
 
-If input is a company name, the system also queries Google via Serper.dev:
-	•	"Netflix ESG report pdf"
-	•	"Netflix sustainability report pdf"
+| 🌱 Environmental | 👥 Social | 🏛️ Governance |
+|:---|:---|:---|
+| Net zero commitments | DEI initiatives | Board independence |
+| Renewable energy use | Workplace safety | Ethics policies |
+| Emissions disclosure | Community programs | Anti-corruption measures |
+| | Employee wellbeing | ESG oversight structure |
 
-It retrieves actual ESG reports from the wider web, not just the company’s homepage.
+### 📊 Comprehensive Scoring
+- Weighted scoring across E, S, and G pillars
+- Overall composite ESG score
+- LLM-generated narrative explanations
 
-This dramatically improves coverage and accuracy.
+### 🖥️ Interactive Web App
+Full-featured Streamlit interface for browser-based ESG analysis.
 
-⸻
+---
 
-3. PDF Extraction
+## 🚀 Quick Start
 
-All discovered PDFs are downloaded and parsed using pypdf:
-	•	Sustainability/ESG reports
-	•	CSR documents
-	•	Annual governance reports
+### Prerequisites
+- Python 3.9+
+- OpenAI API key
+- Serper API key
 
-Their text is merged with HTML content from the crawl.
+### Installation
 
-⸻
+```bash
+# Clone the repository
+git clone https://github.com/mustafakaswani10/esg_scorer.git
+cd esg_scorer
 
-4. Embedding + LLM Analysis
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-The system:
-	•	Chunks all extracted text
-	•	Generates embeddings with Sentence Transformers
-	•	Uses an LLM to extract structured ESG signals:
-	•	Net-zero commitments
-	•	Emissions disclosures
-	•	Diversity statistics
-	•	Anti-corruption policies
-	•	Governance structures
-	•	Community initiatives
-	•	Environmental actions
+# Install dependencies
+pip install -r requirements.txt
+```
 
-⸻
+### Configuration
 
-5. ESG Scoring Engine
+Create a `.env` file in the project root:
 
-A rule-based system converts extracted signals into numeric ESG scores:
-	•	E: 0–100
-	•	S: 0–100
-	•	G: 0–100
-	•	Total: weighted aggregate
+```env
+OPENAI_API_KEY=your_openai_key
+SERPER_API_KEY=your_serper_key
+ESG_MODEL=gpt-4.1  # Optional: specify custom model
+```
 
-⸻
+---
 
-6. Narrative ESG Summary
+## 💻 Usage
 
-The LLM produces:
-	•	A human-readable overview
-	•	Key strengths
-	•	Priority improvement actions
-	•	Rating explanation
+### Command Line
 
-⸻
+```bash
+python main.py
+```
 
-Project Structure
+Enter company names or URLs when prompted:
+```
+> tesla
+> adidas
+> https://www.apple.com
+```
 
+### Streamlit Web App
+
+```bash
+streamlit run app.py
+```
+
+The web interface allows you to:
+- 📝 Enter any company name or URL
+- 📋 View real-time processing logs
+- 📈 Explore ESG scores with visual breakdowns
+- 🔗 Review all sources (URLs, PDFs, snippets)
+
+---
+
+## ☁️ Deployment
+
+### Deploy to Streamlit Cloud
+
+1. Push your repo to GitHub
+2. Visit [share.streamlit.io](https://share.streamlit.io)
+3. Create a new app with these settings:
+   - **Repository:** `your-username/esg_scorer`
+   - **Branch:** `main`
+   - **Main file:** `app.py`
+4. Add secrets in the Streamlit dashboard:
+   ```toml
+   OPENAI_API_KEY = "your_key"
+   SERPER_API_KEY = "your_key"
+   ```
+5. Click **Deploy**
+
+---
+
+## ⚙️ How It Works
+
+```mermaid
+graph LR
+    A[Company Input] --> B[Domain Lookup]
+    B --> C[ESG Page Crawler]
+    C --> D{Enough Data?}
+    D -->|No| E[Full-Site Crawl]
+    D -->|Yes| F[Extract Content]
+    E --> F
+    F --> G[HTML Text]
+    F --> H[PDF Text + OCR]
+    F --> I[Serper Snippets]
+    G & H & I --> J[Combine & Chunk]
+    J --> K[LLM Signal Extraction]
+    K --> L[Score Calculation]
+    L --> M[Generate Explanation]
+    M --> N[Output Results]
+```
+
+---
+
+## 📁 Project Structure
+
+```
 esg_scorer/
-│
-├── main.py                 # Entry point (interactive)
-├── scrape.py               # Site crawler (HTML + ESG PDFs on site)
-├── esg_search.py           # External ESG PDF search using Serper.dev
-├── pdf_utils.py            # PDF download + parsing
-├── text_utils.py           # Chunking, text processing
-├── esg_extract.py          # LLM ESG signal extraction per chunk
-├── score.py                # Rule-based ESG scoring
-├── explain.py              # LLM narrative generation
-├── domain_lookup.py        # Simple domain guesser
+├── app.py              # Streamlit web interface
+├── main.py             # Pipeline orchestration
+├── esg_extract.py      # LLM-based ESG extraction
+├── esg_search.py       # Serper search utilities
+├── score.py            # Scoring logic
+├── explain.py          # Explanation generation
+├── scrape.py           # Web crawling & HTML fetching
+├── text_utils.py       # Text cleaning & chunking
+├── pdf_utils.py        # OCR-based PDF processing
+├── embeddings.py       # Text embeddings
+├── domain_lookup.py    # Official domain resolution
 ├── requirements.txt
 └── README.md
+```
 
-Installation
+---
 
-1. Clone project and create virtual environment
+## 🔑 Environment Variables
 
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+| Variable | Required | Description |
+|:---------|:--------:|:------------|
+| `OPENAI_API_KEY` | ✅ | Powers LLM extraction and explanation generation |
+| `SERPER_API_KEY` | ✅ | Enables web search for ESG evidence |
+| `ESG_MODEL` | ❌ | Custom model override (default: `gpt-4.1`) |
 
-2. Export API keys
+---
 
-You need:
-	•	OpenAI API key
-	•	Serper.dev API key
+## 📄 License
 
-export OPENAI_API_KEY="sk-..."
-export SERPER_API_KEY="serper-..."
+This project is licensed under the [MIT License](LICENSE).
 
-Usage
+---
 
-Run:
-python main.py
-Example Input:
-Enter a company name or URL: netflix
+<div align="center">
 
-Pipeline:
-	•	Crawls https://netflix.com
-	•	Discovers no on-site ESG PDFs
-	•	Uses Serper to find ESG PDFs externally
-	•	Finds:
-	•	Netflix_2022-ESG-Report-FINAL.pdf
-	•	NASDAQ_NFLX_2020 Responsibility Report.pdf
-	•	Downloads + extracts both
-	•	Embeds + chunks
-	•	Runs ESG extraction
-	•	Computes ESG scores
-	•	Generates narrative
+**[⬆ Back to Top](#-esg-scorer)**
 
-Output (summarized)
+Made with 💚 for sustainable investing
 
-Done. Scores:
-{'E': 50, 'S': 80, 'G': 55, 'total': 60}
-
-External ESG PDFs:
- - https://downloads.ctfassets.net/...Netflix_2022-ESG-Report-FINAL.pdf
- - https://www.responsibilityreports.com/...NASDAQ_NFLX_2020.pdf
-
- LLM Narrative Summary (excerpt):
-
-Netflix demonstrates a solid ESG performance with a total score of 60, reflecting balanced efforts across environmental, social, and governance dimensions.
-Achieved its net-zero 2022 commitment…
-Strong diversity policies, workplace safety, community involvement…
-Independent board and anti-corruption policies…
-Recommended improvements include increasing renewable energy share, strengthening governance best practices, and addressing ecosystem risks.
-
-Why This Project Matters
-
-It demonstrates real applied ML/AI engineering, including:
-	•	Multistage data ingestion
-	•	Robust web scraping
-	•	PDF data extraction
-	•	Information retrieval
-	•	Embedding-driven analysis
-	•	LLM orchestration
-	•	Rule-based scoring
-	•	Real-world ESG domain modeling
-
-Perfect to showcase:
-	•	AI engineering
-	•	Data science
-	•	NLP/RAG
-	•	Real-world automation
-	•	ML systems design
-
-⸻
-
-Future Extensions (Optional)
-	•	Multi-query ESG PDF search for higher recall
-	•	Caching of crawled pages + PDFs
-	•	Use Azure/Bing search instead of Serper
-	•	Graph-based ESG signal weighting
-	•	Multi-year ESG trend analysis
-	•	Dashboard for scores
-	•	Batch mode for entire portfolios
-
-⸻
-
-License
-
-Open-source for learning, academic, and portfolio purposes.
-
+</div>
