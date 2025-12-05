@@ -2,6 +2,7 @@
 import os
 import requests
 from scrape import DEFAULT_HEADERS
+from text_utils import dedupe_preserve_order
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 SERPER_URL = "https://google.serper.dev/search"
@@ -112,9 +113,9 @@ def search_esg_pdfs(company_name: str, max_results: int = 5) -> list[str]:
         if pdfs:
             break
 
-    pdfs = list(dict.fromkeys(pdfs))
-    print(f"  -> External ESG search found {len(pdfs)} ESG PDFs.")
-    return pdfs
+    deduped_pdfs = dedupe_preserve_order(pdfs)
+    print(f"  -> External ESG search found {len(deduped_pdfs)} ESG PDFs.")
+    return deduped_pdfs
 
 
 def search_esg_html_pages(company_name: str, max_results: int = 5) -> list[str]:
@@ -149,9 +150,9 @@ def search_esg_html_pages(company_name: str, max_results: int = 5) -> list[str]:
         if urls:
             break
 
-    urls = list(dict.fromkeys(urls))
-    print(f"  -> External ESG HTML search found {len(urls)} pages.")
-    return urls
+    deduped_urls = dedupe_preserve_order(urls)
+    print(f"  -> External ESG HTML search found {len(deduped_urls)} pages.")
+    return deduped_urls
 
 
 def search_esg_snippets(company_name: str, max_results: int = 15) -> list[str]:
@@ -206,5 +207,6 @@ def search_esg_snippets(company_name: str, max_results: int = 15) -> list[str]:
             snippets.append(combined)
             taken_here += 1
 
-    print(f"  -> External ESG snippet search collected {len(snippets)} text snippets.")
-    return snippets
+    deduped_snippets = dedupe_preserve_order(snippets)
+    print(f"  -> External ESG snippet search collected {len(deduped_snippets)} text snippets.")
+    return deduped_snippets

@@ -31,7 +31,7 @@ def main():
 
     st.title("📊 ESG Scorer")
     st.markdown(
-        "Enter a **company name** (e.g. `tesla`, `ford`) or a **URL** "
+        "Enter a **company name** (e.g. `tesla`, `adidas`) or a **URL** "
         "(e.g. `https://www.microsoft.com/en-us/corporate-responsibility/sustainability`)."
     )
 
@@ -47,7 +47,7 @@ def main():
     raw_input_value = st.text_input(
         "Company name or URL",
         value=default_example,
-        help="You can type a bare company name (e.g. `ford`) or a full URL.",
+        help="You can type a bare company name (e.g. `adidas`) or a full URL.",
     )
 
     run_button = st.button("Run ESG analysis", type="primary")

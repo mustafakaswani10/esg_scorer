@@ -1,6 +1,20 @@
 # text_utils.py
 
-from typing import List
+from typing import Iterable, List
+
+
+def dedupe_preserve_order(items: Iterable[str]) -> list[str]:
+    """Return a list with duplicates removed while keeping original order."""
+
+    seen = set()
+    unique: list[str] = []
+
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            unique.append(item)
+
+    return unique
 
 def combine_pages_text(pages: dict) -> str:
     """
