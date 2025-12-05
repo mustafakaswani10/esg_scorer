@@ -1,5 +1,6 @@
 # main.py
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Iterable, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from scrape import crawl_site, fetch_html, html_to_text
@@ -16,7 +17,20 @@ from esg_search import (
 )
 
 
-def crawl_with_fallback(root_url: str) -> tuple[dict, list]:
+@dataclass
+class CrawlResult:
+    pages: dict[str, str]
+    pdf_urls: list[str]
+
+
+@dataclass
+class ExternalSources:
+    pdf_urls: list[str] = field(default_factory=list)
+    html_urls: list[str] = field(default_factory=list)
+    snippets: list[str] = field(default_factory=list)
+
+
+def crawl_with_fallback(root_url: str) -> CrawlResult:
     """
     1) First try ESG-only crawl (URLs with sustainability/ESG keywords).
     2) If we get too few pages, fall back to a broader same-domain crawl.
@@ -29,7 +43,7 @@ def crawl_with_fallback(root_url: str) -> tuple[dict, list]:
 
     if len(pages) >= 3 or pdfs:
         print(f"  -> ESG-focused crawl found {len(pages)} pages and {len(pdfs)} ESG PDFs.")
-        return pages, pdfs
+        return CrawlResult(pages=pages, pdf_urls=pdfs)
 
     print(f"  -> Only {len(pages)} ESG pages and {len(pdfs)} ESG PDFs found. Falling back to full-site crawl...")
     pages_full, pdfs_full = crawl_site(root_url, max_pages=10, max_depth=1, esg_only=False)
@@ -37,7 +51,17 @@ def crawl_with_fallback(root_url: str) -> tuple[dict, list]:
 
     pages_result = pages_full or pages
     pdfs_result = pdfs_full or pdfs
-    return pages_result, pdfs_result
+    return CrawlResult(pages=pages_result, pdf_urls=pdfs_result)
+
+
+def dedupe_preserve_order(urls: Iterable[str]) -> list[str]:
+    seen = set()
+    unique_urls: list[str] = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            unique_urls.append(url)
+    return unique_urls
 
 
 def count_esg_evidence(esg_signals: dict) -> int:
@@ -59,56 +83,109 @@ def count_esg_evidence(esg_signals: dict) -> int:
     return count
 
 
+def search_external_sources(company_name: str) -> ExternalSources:
+    print(f"  -> Searching external web for ESG PDFs for '{company_name}'...")
+    external_pdf_urls = search_esg_pdfs(company_name)
+
+    print(f"  -> Searching external web for ESG HTML pages for '{company_name}'...")
+    external_html_urls = search_esg_html_pages(company_name)
+
+    print(f"  -> Searching external web for ESG text snippets for '{company_name}'...")
+    external_snippets = search_esg_snippets(company_name)
+
+    return ExternalSources(
+        pdf_urls=external_pdf_urls,
+        html_urls=external_html_urls,
+        snippets=external_snippets,
+    )
+
+
+def fetch_external_html_texts(urls: list[str]) -> list[str]:
+    def fetch_and_clean(url: str) -> str:
+        try:
+            html = fetch_html(url)
+            txt = html_to_text(html)
+            return txt.strip()
+        except Exception:
+            return ""
+
+    external_html_pages_text: list[str] = []
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        for txt in ex.map(fetch_and_clean, urls):
+            if txt:
+                external_html_pages_text.append(txt)
+    return external_html_pages_text
+
+
+def combine_text_sources(
+    pdf_texts: list[str],
+    external_html_texts: list[str],
+    serper_snippets: list[str],
+    on_site_text: str,
+) -> str:
+    combined_parts: list[str] = []
+
+    if pdf_texts:
+        combined_parts.append("\n\n".join(pdf_texts))
+    if external_html_texts:
+        combined_parts.append("\n\n".join(external_html_texts))
+    if serper_snippets:
+        combined_parts.append("\n\n".join(serper_snippets))
+    if on_site_text:
+        combined_parts.append(on_site_text)
+
+    return "\n\n".join(combined_parts).strip()
+
+
+def build_empty_text_response(
+    root_url: str,
+    crawl_result: CrawlResult,
+    external_sources: ExternalSources,
+) -> dict:
+    esg_scores = {"E": 0, "S": 0, "G": 0, "total": 0}
+    explanation = (
+        "The system could not extract any machine-readable ESG-related text from the website, "
+        "external reports, or search snippets. This may happen if reports are image-only scans "
+        "or behind complex rendering. Treat this as 'no rating', not as evidence of weak ESG."
+    )
+
+    return {
+        "root_url": root_url,
+        "crawled_urls": list(crawl_result.pages.keys()),
+        "pdf_urls_on_site": crawl_result.pdf_urls,
+        "external_pdf_urls": external_sources.pdf_urls,
+        "external_html_urls": external_sources.html_urls,
+        "external_snippets_count": len(external_sources.snippets),
+        "esg_signals": {},
+        "esg_scores": esg_scores,
+        "explanation": explanation,
+    }
+
+
 def score_website(root_url: str, company_name: Optional[str] = None) -> dict:
     # 1) On-site crawl
-    pages, pdf_urls_on_site = crawl_with_fallback(root_url)
+    crawl_result = crawl_with_fallback(root_url)
 
     # 2) External ESG search (PDFs + HTML + snippets)
-    external_pdf_urls: list[str] = []
-    external_html_urls: list[str] = []
-    external_snippets: list[str] = []
-
-    if company_name:
-        print(f"  -> Searching external web for ESG PDFs for '{company_name}'...")
-        external_pdf_urls = search_esg_pdfs(company_name)
-        print(f"  -> Searching external web for ESG HTML pages for '{company_name}'...")
-        external_html_urls = search_esg_html_pages(company_name)
-        print(f"  -> Searching external web for ESG text snippets for '{company_name}'...")
-        external_snippets = search_esg_snippets(company_name)
+    external_sources = search_external_sources(company_name) if company_name else ExternalSources()
 
     # 3) Merge PDF URLs (on-site + external, de-duplicated)
-    all_pdf_urls: list[str] = []
-    seen = set()
-    for u in pdf_urls_on_site + external_pdf_urls:
-        if u not in seen:
-            seen.add(u)
-            all_pdf_urls.append(u)
+    all_pdf_urls = dedupe_preserve_order(crawl_result.pdf_urls + external_sources.pdf_urls)
 
     # 4) On-site HTML text
     print("  -> Combining on-site HTML text...")
-    on_site_text = combine_pages_text(pages) if pages else ""
+    on_site_text = combine_pages_text(crawl_result.pages) if crawl_result.pages else ""
     print("  -> Combined on-site HTML text length:", len(on_site_text))
 
     # 5) External ESG HTML text (PARALLEL FETCH)
     external_html_pages_text: list[str] = []
-    if external_html_urls:
-        print(f"  -> Downloading and extracting {len(external_html_urls)} external ESG HTML pages in parallel...")
+    if external_sources.html_urls:
+        print(
+            f"  -> Downloading and extracting {len(external_sources.html_urls)} external ESG HTML pages in parallel..."
+        )
+        external_html_pages_text = fetch_external_html_texts(external_sources.html_urls)
 
-        def fetch_and_clean(url: str) -> str:
-            try:
-                html = fetch_html(url)
-                txt = html_to_text(html)
-                return txt.strip()
-            except Exception:
-                return ""
-
-        with ThreadPoolExecutor(max_workers=5) as ex:
-            for txt in ex.map(fetch_and_clean, external_html_urls):
-                if txt:
-                    external_html_pages_text.append(txt)
-
-    external_html_text = "\n\n".join(external_html_pages_text) if external_html_pages_text else ""
-    print("  -> Combined external ESG HTML text length:", len(external_html_text))
+    print("  -> Combined external ESG HTML text length:", len("\n\n".join(external_html_pages_text)))
 
     # 6) PDF text (PARALLEL DOWNLOAD + EXTRACT inside extract_pdf_texts)
     print(f"  -> Downloading and extracting {len(all_pdf_urls)} ESG PDFs in parallel...")
@@ -117,46 +194,23 @@ def score_website(root_url: str, company_name: Optional[str] = None) -> dict:
     print("  -> Combined PDF text length:", len(combined_pdf_text))
 
     # 7) Serper ESG snippets text
-    serper_snippets_text = "\n\n".join(external_snippets) if external_snippets else ""
-    print("  -> Combined Serper snippet text length:", len(serper_snippets_text))
+    serper_snippets_text = external_sources.snippets
+    print("  -> Combined Serper snippet text length:", len("\n\n".join(serper_snippets_text)))
 
     # 8) Combine everything with ESG priority:
     #    PDFs -> external ESG HTML -> snippets -> on-site HTML
-    combined_parts: list[str] = []
+    combined_text = combine_text_sources(
+        pdf_texts=pdf_texts,
+        external_html_texts=external_html_pages_text,
+        serper_snippets=serper_snippets_text,
+        on_site_text=on_site_text,
+    )
 
-    if combined_pdf_text:
-        combined_parts.append(combined_pdf_text)
-    if external_html_text:
-        combined_parts.append(external_html_text)
-    if serper_snippets_text:
-        combined_parts.append(serper_snippets_text)
-    if on_site_text:
-        combined_parts.append(on_site_text)
-
-    combined_text = "\n\n".join(combined_parts).strip()
     print("  -> Combined TOTAL text length:", len(combined_text))
 
     if not combined_text:
         print("  -> No extractable text found in HTML, PDFs, or snippets. Returning 'no rating' result.")
-        esg_scores = {"E": 0, "S": 0, "G": 0, "total": 0}
-
-        explanation = (
-            "The system could not extract any machine-readable ESG-related text from the website, "
-            "external reports, or search snippets. This may happen if reports are image-only scans "
-            "or behind complex rendering. Treat this as 'no rating', not as evidence of weak ESG."
-        )
-
-        return {
-            "root_url": root_url,
-            "crawled_urls": list(pages.keys()),
-            "pdf_urls_on_site": pdf_urls_on_site,
-            "external_pdf_urls": external_pdf_urls,
-            "external_html_urls": external_html_urls,
-            "external_snippets_count": len(external_snippets),
-            "esg_signals": {},
-            "esg_scores": esg_scores,
-            "explanation": explanation,
-        }
+        return build_empty_text_response(root_url, crawl_result, external_sources)
 
     # 9) Chunk + extract
     print("  -> Chunking combined text...")
@@ -185,15 +239,15 @@ def score_website(root_url: str, company_name: Optional[str] = None) -> dict:
 
     return {
         "root_url": root_url,
-            "crawled_urls": list(pages.keys()),
-            "pdf_urls_on_site": pdf_urls_on_site,
-            "external_pdf_urls": external_pdf_urls,
-            "external_html_urls": external_html_urls,
-            "external_snippets_count": len(external_snippets),
-            "esg_signals": esg_signals,
-            "esg_scores": esg_scores,
-            "explanation": explanation,
-        }
+        "crawled_urls": list(crawl_result.pages.keys()),
+        "pdf_urls_on_site": crawl_result.pdf_urls,
+        "external_pdf_urls": external_sources.pdf_urls,
+        "external_html_urls": external_sources.html_urls,
+        "external_snippets_count": len(external_sources.snippets),
+        "esg_signals": esg_signals,
+        "esg_scores": esg_scores,
+        "explanation": explanation,
+    }
 
 
 def normalize_input(user_input: str) -> str:
